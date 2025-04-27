@@ -7,26 +7,36 @@ import (
 )
 
 type RandomTwitch struct {
-	urls []string
+	Streamers []Stream
 }
 
 const twichUrl = "https://www.twitch.tv/"
 
 func NewRandomTwitch() RandomTwitch {
+	rand.Seed(time.Now().UnixNano())
+
+	accessToken, err := GetAccessToken()
+	if err != nil {
+		panic(err)
+	}
+
+	streamers, err := GetStreamers(accessToken)
+	if err != nil {
+		panic(err)
+	}
+
+
 	return RandomTwitch{
-		urls: []string{
-			"xqc",
-			"pokimane",
-			"shroud",
-			"lirik",
-			"ninja",
-		},
+		Streamers: streamers,
 	}
 }
 
 func (rt *RandomTwitch) GetRandomTwitch() string {
-	rand.Seed(time.Now().UnixNano())
-	randomTwitch := rt.urls[rand.Intn(len(rt.urls))]
+	if len(rt.Streamers) == 0 {
+		return ""
+	}
 
-	return fmt.Sprintf("%s%s", twichUrl, randomTwitch)
+	selected := rt.Streamers[rand.Intn(len(rt.Streamers))]
+
+	return fmt.Sprintf("%s%s", twichUrl, selected.Username)
 }
