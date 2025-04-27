@@ -1,6 +1,6 @@
 package main
 
-import "github.com/RootControl/Twitch/internal"
+import "github.com/RootControl/twitch/internal"
 
 func main() {
 	randomTwitch := internal.NewRandomTwitch()
