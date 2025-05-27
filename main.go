@@ -1,9 +1,11 @@
 package main
 
-import "github.com/RootControl/twitch/internal"
+import "github.com/RootControl/twitch/api"
 
 func main() {
-	randomTwitch := internal.NewRandomTwitch()
-	url := randomTwitch.GetRandomTwitch()
-	internal.OpenBrowser(url)
+	streamers := api.GetLiveStreams()
+
+	for _, stream := range streamers.Data {
+		println(stream.GetMainInfo())
+	}
 }

@@ -1,4 +1,4 @@
-package internal
+package browser
 
 import (
 	"os/exec"
