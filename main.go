@@ -3,9 +3,14 @@ package main
 import "github.com/RootControl/twitch/api"
 
 func main() {
-	streamers := api.GetLiveStreams()
+	// streamers := api.GetLiveStreams()
+	//
+	// for _, stream := range streamers.Data {
+	// 	println(stream.GetMainInfo())
+	// }
 
-	for _, stream := range streamers.Data {
-		println(stream.GetMainInfo())
+	categories := api.GetCategories("software")
+	for _, category := range categories.Data {
+		println(category.ToString())
 	}
 }
