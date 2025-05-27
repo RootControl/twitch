@@ -9,8 +9,12 @@ func main() {
 	// 	println(stream.GetMainInfo())
 	// }
 
-	categories := api.GetCategories("software")
-	for _, category := range categories.Data {
-		println(category.ToString())
-	}
+	// categories := api.GetCategories("software")
+	// for _, category := range categories.Data {
+	// 	println(category.ToString())
+	// }
+
+	user := api.GetUser("loganeisenhorn")
+
+	println(user.Data[0].ToString())
 }
