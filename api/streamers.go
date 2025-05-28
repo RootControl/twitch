@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	GET_LIVE_STREAMS = "streams"
+	GET_LIVE_STREAMS     = "streams"
+	GET_FOLLOWED_STREAMS = "streams/followed"
 )
 
 type StreamResponse struct {
@@ -27,6 +28,22 @@ func GetLiveStreams() StreamResponse {
 	request := NewApiRequest()
 
 	responseBuffer := request.Get(GET_LIVE_STREAMS, "-q type=live", "-q first=30")
+
+	var response StreamResponse
+	err := json.Unmarshal(responseBuffer.Bytes(), &response)
+	if err != nil {
+		log.Fatalf("Error parsing JSON: %v", err)
+	}
+
+	return response
+}
+
+func GetFollowedStreams() StreamResponse {
+	request := NewApiRequest()
+
+	// TODO: get user id from .env, if not found then request user info
+
+	responseBuffer := request.Get(GET_FOLLOWED_STREAMS, "-q user_id=903046539", "-q first=50")
 
 	var response StreamResponse
 	err := json.Unmarshal(responseBuffer.Bytes(), &response)

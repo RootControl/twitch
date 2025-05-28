@@ -2,6 +2,8 @@ package entities
 
 import "fmt"
 
+const TwitchURL = "https://www.twitch.tv/"
+
 type Stream struct {
 	Id           string   `json:"id"`
 	UserId       string   `json:"user_id"`
@@ -21,25 +23,9 @@ type Stream struct {
 }
 
 func NewStream() *Stream {
-	return &Stream{
-		Id:           "",
-		UserId:       "",
-		UserLogin:    "",
-		Username:     "",
-		GameId:       "",
-		GameName:     "",
-		Type:         "",
-		Title:        "",
-		Tags:         make([]string, 0),
-		ViewerCount:  0,
-		StartedAt:    "",
-		Language:     "",
-		ThumbnailUrl: "",
-		TagsIds:      make([]string, 0),
-		IsMature:     false,
-	}
+	return &Stream{}
 }
 
 func (s *Stream) GetMainInfo() string {
-	return fmt.Sprintf("User: %s\nTitle: %s\nCategory: %s\n", s.Username, s.Title, s.GameName)
+	return fmt.Sprintf("User: %s\nTitle: %s\nCategory: %s\nLink: %s\n", s.Username, s.Title, s.GameName, TwitchURL+s.UserLogin)
 }

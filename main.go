@@ -14,7 +14,12 @@ func main() {
 	// 	println(category.ToString())
 	// }
 
-	user := api.GetUser("loganeisenhorn")
+	// user := api.GetUser("loganeisenhorn")
+	//
+	// println(user.Data[0].ToString())
 
-	println(user.Data[0].ToString())
+	followedStreams := api.GetFollowedStreams()
+	for _, stream := range followedStreams.Data {
+		println(stream.GetMainInfo())
+	}
 }
