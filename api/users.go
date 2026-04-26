@@ -12,15 +12,15 @@ type UserResponse struct {
 }
 
 func GetUser(login string) *UserResponse {
-	request := NewApiRequest()
+	return getUser(login, nil)
+}
 
-	responseBuffer := request.Get("users", "-q login="+login)
-
+func getUser(login string, e Executor) *UserResponse {
+	request := newRequestWithExecutor(orShell(e))
+	buf := request.Get("users", "-q login="+login)
 	var response UserResponse
-	err := json.Unmarshal(responseBuffer.Bytes(), &response)
-	if err != nil {
+	if err := json.Unmarshal(buf.Bytes(), &response); err != nil {
 		log.Fatalf("Error parsing JSON: %v", err)
 	}
-
 	return &response
 }

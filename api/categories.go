@@ -22,15 +22,15 @@ func NewCategoriesResponse() *CategoriesResponse {
 }
 
 func GetCategories(categoryName string) CategoriesResponse {
-	request := NewApiRequest()
+	return getCategories(categoryName, nil)
+}
 
-	responseBuffer := request.Get(SEARCH_CATEGORIES, "-q query="+categoryName, "-q first=50")
-
+func getCategories(categoryName string, e Executor) CategoriesResponse {
+	request := newRequestWithExecutor(orShell(e))
+	buf := request.Get(SEARCH_CATEGORIES, "-q query="+categoryName, "-q first=50")
 	var response CategoriesResponse
-	err := json.Unmarshal(responseBuffer.Bytes(), &response)
-	if err != nil {
+	if err := json.Unmarshal(buf.Bytes(), &response); err != nil {
 		log.Fatalf("Error parsing JSON: %v", err)
 	}
-
 	return response
 }
