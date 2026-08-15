@@ -1,1 +1,6 @@
 .env
+
+# Build artifacts. "twitch" is the default `go build` name; "ttv" is what the
+# Makefile produces.
+/ttv
+/twitch

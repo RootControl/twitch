@@ -5,12 +5,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-go run main.go       # Run the application
-go build ./...       # Build all packages
-go vet ./...         # Lint/static analysis
-go test ./...        # Run all tests
+make                 # Build ./ttv
+make install         # Build and install to $GOBIN
+make check           # gofmt check, go vet, and tests — run before pushing
+make run ARGS="..."  # Build and run with arguments
 go test ./api/...    # Run tests in a specific package
 ```
+
+The Makefile builds as `ttv`, not `twitch`: the default `go build` name collides with the Twitch CLI this tool shells out to, and would shadow it on `PATH`.
 
 **Prerequisite:** The [Twitch CLI](https://dev.twitch.tv/docs/cli/) must be installed and authenticated (`twitch token`) for API calls to work. All API calls are executed as subprocesses of the `twitch` binary.
 

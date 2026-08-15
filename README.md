@@ -27,16 +27,30 @@ twitch token -u -s 'user:read:follows user:edit:follows'
 ```bash
 git clone https://github.com/RootControl/twitch.git
 cd twitch
-go build -o ttv .
+make install
 ```
 
-> **Do not install this binary as `twitch`.** `go build` names it `twitch` by default, which collides with the Twitch CLI it shells out to. If it lands earlier on your `PATH` than the real CLI, it will invoke itself recursively. Build it under a distinct name (`ttv` above) before putting it on your `PATH`:
+That builds the binary as `ttv` and installs it to `$GOBIN` (or `$(go env GOPATH)/bin`), which the Go toolchain already expects on your `PATH`. `make install` warns if it isn't. For a system-wide install:
 
 ```bash
-sudo mv ttv /usr/local/bin/
+sudo make install PREFIX=/usr/local/bin
 ```
 
+> **Do not install this binary as `twitch`.** `go build` names it `twitch` by default, which collides with the Twitch CLI it shells out to. If it lands earlier on your `PATH` than the real CLI, it will invoke itself recursively. Override the name only if you have somewhere safe for it: `make install BINARY=tw`.
+
 The tool adopts whatever name you invoke it as, so its help text and completion scripts follow suit. The examples below use `twitch` for readability — substitute the name you installed.
+
+Run `make help` for all targets. The useful ones:
+
+| Target | Description |
+| --- | --- |
+| `make` | Build `./ttv` |
+| `make install` | Build and install to `$(PREFIX)` |
+| `make uninstall` | Remove the installed binary |
+| `make run ARGS="streams -g Rust"` | Build and run |
+| `make check` | gofmt check, `go vet`, and tests — run before pushing |
+| `make test` / `make race` | Tests, with or without the race detector |
+| `make clean` | Remove build artifacts |
 
 ## Configuration
 
