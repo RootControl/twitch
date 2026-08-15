@@ -142,6 +142,66 @@ func TestFollowedCommandRegistered(t *testing.T) {
 	}
 }
 
+// ---- invoked name ----
+
+func TestExecutableName(t *testing.T) {
+	orig := os.Args
+	t.Cleanup(func() { os.Args = orig })
+
+	cases := []struct {
+		argv0 string
+		want  string
+	}{
+		{"ttv", "ttv"},
+		{"./ttv", "ttv"},
+		{"/usr/local/bin/ttv", "ttv"},
+		{"/usr/local/bin/ttv.exe", "ttv"},
+		{"twitch", "twitch"},
+		{"", defaultName},
+		{"/", defaultName},
+	}
+	for _, tc := range cases {
+		os.Args = []string{tc.argv0}
+		if got := executableName(); got != tc.want {
+			t.Errorf("executableName() with argv[0]=%q = %q, want %q", tc.argv0, got, tc.want)
+		}
+	}
+}
+
+func TestExecutableNameWithoutArgs(t *testing.T) {
+	orig := os.Args
+	t.Cleanup(func() { os.Args = orig })
+
+	os.Args = nil
+	if got := executableName(); got != defaultName {
+		t.Errorf("executableName() with no argv = %q, want %q", got, defaultName)
+	}
+}
+
+// The generated completion script must register the invoked name, since the
+// binary is commonly installed as something other than "twitch".
+func TestCompletionUsesInvokedName(t *testing.T) {
+	orig := rootCmd.Use
+	t.Cleanup(func() { rootCmd.Use = orig })
+
+	rootCmd.Use = "ttv"
+	out, err := executeCommand("completion", "zsh")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "#compdef ttv") {
+		t.Errorf("completion should register 'ttv', got first line: %q", firstLine(out))
+	}
+	if strings.Contains(out, "#compdef twitch") {
+		t.Errorf("completion still registers 'twitch': %q", firstLine(out))
+	}
+}
+
+func firstLine(s string) string {
+	line, _, _ := strings.Cut(s, "\n")
+	return line
+}
+
 // ---- output helpers ----
 
 func TestPrintJSON(t *testing.T) {

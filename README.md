@@ -36,7 +36,7 @@ go build -o ttv .
 sudo mv ttv /usr/local/bin/
 ```
 
-The examples below use `twitch` for readability — substitute whatever name you installed.
+The tool adopts whatever name you invoke it as, so its help text and completion scripts follow suit. The examples below use `twitch` for readability — substitute the name you installed.
 
 ## Configuration
 
@@ -216,15 +216,11 @@ Desktop notifications use `osascript` on macOS and `notify-send` on Linux; Windo
 Supports `bash`, `zsh`, `fish`, and `powershell`.
 
 ```bash
-twitch completion zsh > "${fpath[1]}/_twitch"
-twitch completion bash > /etc/bash_completion.d/twitch
+ttv completion zsh > "${fpath[1]}/_ttv"
+ttv completion bash > /etc/bash_completion.d/ttv
 ```
 
-The generated script always registers the command name `twitch`, regardless of what you named the binary. If you installed it as `ttv`, rewrite the name on the way out:
-
-```bash
-ttv completion zsh | sed 's/twitch/ttv/g' > "${fpath[1]}/_ttv"
-```
+The script registers whatever name you invoked the binary as, so it matches the name you installed it under with no editing.
 
 ## Scripting
 

@@ -24,6 +24,8 @@ This is a Go CLI tool that wraps the Twitch CLI to query the Twitch API.
 
 **Error handling:** the `api` and `config` packages return errors — they must never call `log.Fatal`, since `watch` is a long-running loop that has to survive a transient failure. Commands use cobra's `RunE`, and `cmd.Execute()` prints the error and exits 1. The Twitch CLI reports API errors as a JSON envelope on **stdout** with a non-zero exit status, so `fetch`/`mutate` check the payload with `checkAPIError` *before* the exit status; otherwise a 401 is indistinguishable from an empty result set.
 
+**Command name:** the default build name (`twitch`) collides with the Twitch CLI this tool shells out to, so it is usually installed under another name. `Execute()` sets `rootCmd.Use` from `os.Args[0]` so usage text and generated completion scripts follow the invoked name. Tests drive `rootCmd.Execute()` directly and therefore keep the `defaultName` literal.
+
 **Packages:**
 - `cmd/` — one file per command group, wired up in `root.go`. `output.go` holds shared JSON/table printing and the `isInteractive()` TTY check.
 - `api/` — one file per resource type (`streamers.go`, `users.go`, `categories.go`, `channel.go`, `follows.go`), each defining a response struct and query functions. Shared invocation logic lives in `twitchAPI.go`.
