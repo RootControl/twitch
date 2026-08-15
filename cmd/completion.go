@@ -1,26 +1,25 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 )
 
 var completionCmd = &cobra.Command{
-	Use:   "completion [bash|zsh|fish|powershell]",
-	Short: "Generate shell autocompletion script",
-	Args:  cobra.ExactArgs(1),
+	Use:       "completion [bash|zsh|fish|powershell]",
+	Short:     "Generate shell autocompletion script",
+	Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 	ValidArgs: []string{"bash", "zsh", "fish", "powershell"},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		out := cmd.OutOrStdout()
 		switch args[0] {
 		case "bash":
-			return rootCmd.GenBashCompletion(os.Stdout)
+			return rootCmd.GenBashCompletion(out)
 		case "zsh":
-			return rootCmd.GenZshCompletion(os.Stdout)
+			return rootCmd.GenZshCompletion(out)
 		case "fish":
-			return rootCmd.GenFishCompletion(os.Stdout, true)
+			return rootCmd.GenFishCompletion(out, true)
 		case "powershell":
-			return rootCmd.GenPowerShellCompletionWithDesc(os.Stdout)
+			return rootCmd.GenPowerShellCompletionWithDesc(out)
 		default:
 			return cmd.Help()
 		}
