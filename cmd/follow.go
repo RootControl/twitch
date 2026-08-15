@@ -11,15 +11,20 @@ var followCmd = &cobra.Command{
 	Use:   "follow <username>",
 	Short: "Follow a Twitch channel",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		login := args[0]
-		resp := api.GetUser(login)
-		if len(resp.Data) == 0 {
-			fmt.Printf("User %q not found\n", login)
-			return
+		resp, err := api.GetUser(login)
+		if err != nil {
+			return err
 		}
-		api.FollowChannel(resp.Data[0].ID)
-		fmt.Printf("Now following %s\n", resp.Data[0].DisplayName)
+		if len(resp.Data) == 0 {
+			return fmt.Errorf("user %q not found", login)
+		}
+		if err := api.FollowChannel(resp.Data[0].ID); err != nil {
+			return err
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "Now following %s\n", resp.Data[0].DisplayName)
+		return nil
 	},
 }
 
@@ -27,14 +32,19 @@ var unfollowCmd = &cobra.Command{
 	Use:   "unfollow <username>",
 	Short: "Unfollow a Twitch channel",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		login := args[0]
-		resp := api.GetUser(login)
-		if len(resp.Data) == 0 {
-			fmt.Printf("User %q not found\n", login)
-			return
+		resp, err := api.GetUser(login)
+		if err != nil {
+			return err
 		}
-		api.UnfollowChannel(resp.Data[0].ID)
-		fmt.Printf("Unfollowed %s\n", resp.Data[0].DisplayName)
+		if len(resp.Data) == 0 {
+			return fmt.Errorf("user %q not found", login)
+		}
+		if err := api.UnfollowChannel(resp.Data[0].ID); err != nil {
+			return err
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "Unfollowed %s\n", resp.Data[0].DisplayName)
+		return nil
 	},
 }

@@ -1,13 +1,13 @@
 package api
 
 import (
-	"encoding/json"
-	"log"
-
 	"github.com/RootControl/twitch/entities"
 )
 
-const SEARCH_CATEGORIES = "search/categories"
+const (
+	SEARCH_CATEGORIES = "search/categories"
+	TOP_GAMES         = "games/top"
+)
 
 type CategoriesResponse struct {
 	Data       []entities.Category `json:"data"`
@@ -21,16 +21,22 @@ func NewCategoriesResponse() *CategoriesResponse {
 	}
 }
 
-func GetCategories(categoryName string) CategoriesResponse {
-	return getCategories(categoryName, nil)
+func GetCategories(categoryName string, limit int) (CategoriesResponse, error) {
+	return getCategories(categoryName, limit, nil)
 }
 
-func getCategories(categoryName string, e Executor) CategoriesResponse {
-	request := newRequestWithExecutor(orShell(e))
-	buf := request.Get(SEARCH_CATEGORIES, "-q query="+categoryName, "-q first=50")
-	var response CategoriesResponse
-	if err := json.Unmarshal(buf.Bytes(), &response); err != nil {
-		log.Fatalf("Error parsing JSON: %v", err)
-	}
-	return response
+func getCategories(categoryName string, limit int, e Executor) (CategoriesResponse, error) {
+	return fetch[CategoriesResponse](e, SEARCH_CATEGORIES,
+		Q("query", categoryName),
+		Q("first", clampLimit(limit)),
+	)
+}
+
+// GetTopGames returns the categories with the most current viewers.
+func GetTopGames(limit int) (CategoriesResponse, error) {
+	return getTopGames(limit, nil)
+}
+
+func getTopGames(limit int, e Executor) (CategoriesResponse, error) {
+	return fetch[CategoriesResponse](e, TOP_GAMES, Q("first", clampLimit(limit)))
 }

@@ -63,7 +63,7 @@ func TestLoadEmptyWhenEnvNotSet(t *testing.T) {
 	}
 }
 
-func TestMustUserIDReturnsValue(t *testing.T) {
+func TestUserIDReturnsValue(t *testing.T) {
 	resetCache()
 	os.Setenv("TWITCH_USER_ID", "99")
 	t.Cleanup(func() {
@@ -71,12 +71,26 @@ func TestMustUserIDReturnsValue(t *testing.T) {
 		resetCache()
 	})
 
-	if id := MustUserID(); id != "99" {
-		t.Errorf("MustUserID() = %q, want %q", id, "99")
+	id, err := UserID()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if id != "99" {
+		t.Errorf("UserID() = %q, want %q", id, "99")
 	}
 }
 
-func TestMustUserLoginReturnsValue(t *testing.T) {
+func TestUserIDErrorsWhenUnset(t *testing.T) {
+	resetCache()
+	os.Unsetenv("TWITCH_USER_ID")
+	t.Cleanup(resetCache)
+
+	if _, err := UserID(); err == nil {
+		t.Error("UserID() should return an error when TWITCH_USER_ID is unset")
+	}
+}
+
+func TestUserLoginReturnsValue(t *testing.T) {
 	resetCache()
 	os.Setenv("TWITCH_USER_LOGIN", "mylogin")
 	t.Cleanup(func() {
@@ -84,7 +98,21 @@ func TestMustUserLoginReturnsValue(t *testing.T) {
 		resetCache()
 	})
 
-	if login := MustUserLogin(); login != "mylogin" {
-		t.Errorf("MustUserLogin() = %q, want %q", login, "mylogin")
+	login, err := UserLogin()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if login != "mylogin" {
+		t.Errorf("UserLogin() = %q, want %q", login, "mylogin")
+	}
+}
+
+func TestUserLoginErrorsWhenUnset(t *testing.T) {
+	resetCache()
+	os.Unsetenv("TWITCH_USER_LOGIN")
+	t.Cleanup(resetCache)
+
+	if _, err := UserLogin(); err == nil {
+		t.Error("UserLogin() should return an error when TWITCH_USER_LOGIN is unset")
 	}
 }

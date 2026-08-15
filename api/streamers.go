@@ -1,10 +1,10 @@
 package api
 
 import (
-	"encoding/json"
-	"log"
+	"fmt"
+	"strconv"
+	"strings"
 
-	"github.com/RootControl/twitch/config"
 	"github.com/RootControl/twitch/entities"
 )
 
@@ -13,9 +13,15 @@ const (
 	GET_FOLLOWED_STREAMS = "streams/followed"
 )
 
+// DefaultLimit is the page size used when a caller does not specify one.
+const DefaultLimit = 30
+
+// maxLimit is the largest page size the Helix API accepts.
+const maxLimit = 100
+
 type StreamResponse struct {
-	Data       []entities.Stream `json:"data"`
-	Pagination entities.Pagination
+	Data       []entities.Stream   `json:"data"`
+	Pagination entities.Pagination `json:"pagination"`
 }
 
 func NewStreamResponse() *StreamResponse {
@@ -25,58 +31,74 @@ func NewStreamResponse() *StreamResponse {
 	}
 }
 
-func GetLiveStreams() StreamResponse {
-	return getLiveStreams(nil)
-}
-
-func getLiveStreams(e Executor) StreamResponse {
-	request := newRequestWithExecutor(orShell(e))
-	buf := request.Get(GET_LIVE_STREAMS, "-q type=live", "-q first=30")
-	var response StreamResponse
-	if err := json.Unmarshal(buf.Bytes(), &response); err != nil {
-		log.Fatalf("Error parsing JSON: %v", err)
+// clampLimit keeps the requested page size within what Helix accepts.
+func clampLimit(limit int) string {
+	if limit <= 0 {
+		limit = DefaultLimit
 	}
-	return response
-}
-
-func GetFollowedStreams() StreamResponse {
-	return getFollowedStreams(nil)
-}
-
-func getFollowedStreams(e Executor) StreamResponse {
-	request := newRequestWithExecutor(orShell(e))
-	buf := request.Get(GET_FOLLOWED_STREAMS, "-q user_id="+config.MustUserID(), "-q first=50")
-	var response StreamResponse
-	if err := json.Unmarshal(buf.Bytes(), &response); err != nil {
-		log.Fatalf("Error parsing JSON: %v", err)
+	if limit > maxLimit {
+		limit = maxLimit
 	}
-	return response
+	return strconv.Itoa(limit)
 }
 
-func GetStreamsByGame(gameName string) StreamResponse {
-	return getStreamsByGame(gameName, nil)
+func GetLiveStreams(limit int) (StreamResponse, error) {
+	return getLiveStreams(limit, nil)
 }
 
-func getStreamsByGame(gameName string, e Executor) StreamResponse {
-	// Resolve game name to ID first.
-	cats := getCategories(gameName, e)
+func getLiveStreams(limit int, e Executor) (StreamResponse, error) {
+	return fetch[StreamResponse](e, GET_LIVE_STREAMS,
+		Q("type", "live"),
+		Q("first", clampLimit(limit)),
+	)
+}
+
+func GetFollowedStreams(limit int) (StreamResponse, error) {
+	return getFollowedStreams(limit, nil)
+}
+
+func getFollowedStreams(limit int, e Executor) (StreamResponse, error) {
+	userID, err := resolveUserID(e)
+	if err != nil {
+		return StreamResponse{}, err
+	}
+	return fetch[StreamResponse](e, GET_FOLLOWED_STREAMS,
+		Q("user_id", userID),
+		Q("first", clampLimit(limit)),
+	)
+}
+
+func GetStreamsByGame(gameName string, limit int) (StreamResponse, error) {
+	return getStreamsByGame(gameName, limit, nil)
+}
+
+func getStreamsByGame(gameName string, limit int, e Executor) (StreamResponse, error) {
+	// Resolve the game name to an ID first.
+	cats, err := getCategories(gameName, 0, e)
+	if err != nil {
+		return StreamResponse{}, err
+	}
 	if len(cats.Data) == 0 {
-		return StreamResponse{}
+		return StreamResponse{}, fmt.Errorf("no category matches %q", gameName)
 	}
-	gameID := cats.Data[0].ID
 
-	request := newRequestWithExecutor(orShell(e))
-	buf := request.Get(GET_LIVE_STREAMS, "-q type=live", "-q game_id="+gameID, "-q first=30")
-	var response StreamResponse
-	if err := json.Unmarshal(buf.Bytes(), &response); err != nil {
-		log.Fatalf("Error parsing JSON: %v", err)
-	}
-	return response
+	gameID := bestCategoryMatch(cats.Data, gameName).ID
+
+	return fetch[StreamResponse](e, GET_LIVE_STREAMS,
+		Q("type", "live"),
+		Q("game_id", gameID),
+		Q("first", clampLimit(limit)),
+	)
 }
 
-func orShell(e Executor) Executor {
-	if e != nil {
-		return e
+// bestCategoryMatch prefers an exact (case-insensitive) name match over the
+// first fuzzy result, so `--game Rust` does not resolve to "Rust Console
+// Edition" just because the search ranked it first.
+func bestCategoryMatch(cats []entities.Category, want string) entities.Category {
+	for _, c := range cats {
+		if strings.EqualFold(c.Name, want) {
+			return c
+		}
 	}
-	return shellExecutor
+	return cats[0]
 }

@@ -1,29 +1,33 @@
 package api
 
-import (
-	"github.com/RootControl/twitch/config"
-)
+const FOLLOWED_CHANNELS = "channels/followed"
 
-func FollowChannel(broadcasterID string) {
-	followChannel(broadcasterID, nil)
+func FollowChannel(broadcasterID string) error {
+	return followChannel(broadcasterID, nil)
 }
 
-func followChannel(broadcasterID string, e Executor) {
-	request := newRequestWithExecutor(orShell(e))
-	request.Post("channels/followed",
-		"-q broadcaster_id="+broadcasterID,
-		"-q user_id="+config.MustUserID(),
+func followChannel(broadcasterID string, e Executor) error {
+	userID, err := resolveUserID(e)
+	if err != nil {
+		return err
+	}
+	return mutate(e, "post", FOLLOWED_CHANNELS,
+		Q("broadcaster_id", broadcasterID),
+		Q("user_id", userID),
 	)
 }
 
-func UnfollowChannel(broadcasterID string) {
-	unfollowChannel(broadcasterID, nil)
+func UnfollowChannel(broadcasterID string) error {
+	return unfollowChannel(broadcasterID, nil)
 }
 
-func unfollowChannel(broadcasterID string, e Executor) {
-	request := newRequestWithExecutor(orShell(e))
-	request.Delete("channels/followed",
-		"-q broadcaster_id="+broadcasterID,
-		"-q user_id="+config.MustUserID(),
+func unfollowChannel(broadcasterID string, e Executor) error {
+	userID, err := resolveUserID(e)
+	if err != nil {
+		return err
+	}
+	return mutate(e, "delete", FOLLOWED_CHANNELS,
+		Q("broadcaster_id", broadcasterID),
+		Q("user_id", userID),
 	)
 }

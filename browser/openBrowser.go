@@ -14,7 +14,7 @@ func OpenBrowser(url string) error {
 		cmd = "open"
 		args = []string{url}
 	case "windows":
-		cmd = "rund1132"
+		cmd = "rundll32"
 		args = []string{"url.dll,FileProtocolHandler", url}
 	default:
 		cmd = "xdg-open"
