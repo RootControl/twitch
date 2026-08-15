@@ -1,9 +1,11 @@
 package entities
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 )
 
@@ -59,6 +61,36 @@ func TestStreamDecodesTagIDs(t *testing.T) {
 	}
 	if len(s.TagsIds) != 2 {
 		t.Errorf("TagsIds = %#v, want 2 entries", s.TagsIds)
+	}
+}
+
+// promptui renders items through text/template and passes them by value. A
+// pointer method is not in the method set of a non-addressable value, so with
+// a pointer receiver the template cannot resolve these and renders the raw
+// struct instead.
+func TestStreamMethodsResolveFromTemplate(t *testing.T) {
+	s := Stream{
+		Username:  "streamer1",
+		UserLogin: "streamer1",
+		Title:     "Coding",
+		StartedAt: "2020-01-01T00:00:00Z",
+	}
+
+	for _, expr := range []string{"{{ .Uptime }}", "{{ .URL }}", "{{ .GetMainInfo }}"} {
+		tmpl, err := template.New("t").Parse(expr)
+		if err != nil {
+			t.Fatalf("parsing %s: %v", expr, err)
+		}
+
+		var buf bytes.Buffer
+		// Pass by value, exactly as promptui does.
+		if err := tmpl.Execute(&buf, s); err != nil {
+			t.Errorf("executing %s: %v", expr, err)
+			continue
+		}
+		if buf.Len() == 0 {
+			t.Errorf("%s rendered empty", expr)
+		}
 	}
 }
 

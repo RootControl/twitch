@@ -3,11 +3,14 @@ package cmd
 import (
 	"bytes"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/RootControl/twitch/config"
 	"github.com/RootControl/twitch/entities"
+	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -243,6 +246,174 @@ func TestTruncate(t *testing.T) {
 		if got := truncate(tc.in, tc.max); got != tc.want {
 			t.Errorf("truncate(%q, %d) = %q, want %q", tc.in, tc.max, got, tc.want)
 		}
+	}
+}
+
+func TestDisplayWidth(t *testing.T) {
+	cases := []struct {
+		in   string
+		want int
+	}{
+		{"", 0},
+		{"plain", 5},
+		{"héllo", 5}, // precomposed accents are single-width
+		{"🌸", 2},     // emoji occupy two columns
+		{"a🌸b", 4},
+		{"日本語", 6}, // CJK is double-width
+		{"é", 1},  // combining acute adds no width
+		{"👍️", 2},  // variation selector adds no width
+	}
+	for _, tc := range cases {
+		if got := displayWidth(tc.in); got != tc.want {
+			t.Errorf("displayWidth(%q) = %d, want %d", tc.in, got, tc.want)
+		}
+	}
+}
+
+// Every line handed to promptui must fit the terminal: its screen buffer
+// counts logical lines, so a wrapped line corrupts the redraw.
+func TestTruncateNeverExceedsWidth(t *testing.T) {
+	inputs := []string{
+		"short",
+		"🌸🌸🌸🌸🌸🌸🌸🌸🌸🌸🌸🌸",
+		"FREAK BOB FRIDAY | #BUNGULATE 🌸 [English funny gaming Ptuber fpsgame]",
+		"日本語のタイトルです",
+		"mixed 🌸 content with 日本語 and ascii",
+	}
+	for _, in := range inputs {
+		for _, max := range []int{1, 2, 5, 10, 20, 40} {
+			got := truncate(in, max)
+			if w := displayWidth(got); w > max {
+				t.Errorf("truncate(%q, %d) = %q, width %d exceeds %d", in, max, got, w, max)
+			}
+		}
+	}
+}
+
+func TestTruncateZeroWidth(t *testing.T) {
+	if got := truncate("anything", 0); got != "" {
+		t.Errorf("truncate(_, 0) = %q, want empty", got)
+	}
+}
+
+// The budgets must keep a rendered list row inside the terminal.
+func TestItemWidthsFitTerminal(t *testing.T) {
+	for _, width := range []int{20, 40, 80, 120, 200} {
+		name, game, detail := itemWidths(width)
+
+		// "▶ NAME (GAME) - 12345 viewers"
+		row := displayWidth("▶ ") + name + displayWidth(" (") + game +
+			displayWidth(") - ") + len("12345") + displayWidth(" viewers")
+		if width >= 60 && row > width {
+			t.Errorf("width %d: list row needs %d columns", width, row)
+		}
+		// "Channel:  VALUE"
+		if width >= 60 && 10+detail > width {
+			t.Errorf("width %d: detail row needs %d columns", width, 10+detail)
+		}
+		if name <= 0 || game <= 0 || detail <= 0 {
+			t.Errorf("width %d: got non-positive budgets (%d, %d, %d)", width, name, game, detail)
+		}
+	}
+}
+
+func TestNewStreamItemsTruncates(t *testing.T) {
+	long := strings.Repeat("very long title ", 20)
+	items := newStreamItems([]entities.Stream{
+		{Username: "streamer1", GameName: "Software and Game Dev", Title: long, ViewerCount: 5,
+			StartedAt: "2020-01-01T00:00:00Z"},
+	}, 80)
+
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	it := items[0]
+	if displayWidth(it.Title) > 80 {
+		t.Errorf("title not truncated: width %d", displayWidth(it.Title))
+	}
+	if it.Viewers != 5 {
+		t.Errorf("Viewers = %d, want 5", it.Viewers)
+	}
+	if it.Uptime == "" {
+		t.Error("Uptime should be populated for a stream with a start time")
+	}
+	// The untruncated stream must be preserved for searching and opening.
+	if it.stream.Title != long {
+		t.Error("original stream title should be preserved on the item")
+	}
+}
+
+var ansi = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
+// This is the end-to-end guard for the redraw corruption: render the real
+// templates against a hostile stream and assert every line fits the terminal.
+// A single over-wide line makes promptui wrap, miscount its own height, and
+// leave the previous frame on screen when the user moves the cursor.
+func TestRenderedLinesFitTerminal(t *testing.T) {
+	stream := entities.Stream{
+		Username:    "AVeryLongChannelNameThatKeepsGoingAndGoing",
+		GameName:    "A Category With An Unreasonably Long Name Indeed",
+		Title:       "First time playing Grand Theft Auto V!!! (Day 3) 🌸 | @marzzzzy !socials !fractalSS | FREAK BOB FRIDAY | #BUNGULATE [English funny gaming Ptuber fpsgame]",
+		ViewerCount: 123456,
+		StartedAt:   "2020-01-01T00:00:00Z",
+	}
+
+	tmpls := streamSelectTemplates()
+	for _, width := range []int{60, 80, 100, 120, 200} {
+		items := newStreamItems([]entities.Stream{stream}, width)
+
+		for name, src := range map[string]string{
+			"active":   tmpls.Active,
+			"inactive": tmpls.Inactive,
+			"details":  tmpls.Details,
+		} {
+			tmpl, err := template.New(name).Funcs(promptui.FuncMap).Parse(src)
+			if err != nil {
+				t.Fatalf("parsing %s: %v", name, err)
+			}
+
+			var buf bytes.Buffer
+			if err := tmpl.Execute(&buf, items[0]); err != nil {
+				t.Fatalf("executing %s: %v", name, err)
+			}
+
+			for _, line := range strings.Split(buf.String(), "\n") {
+				// Colour codes occupy no columns on screen.
+				plain := ansi.ReplaceAllString(line, "")
+				if w := displayWidth(plain); w > width {
+					t.Errorf("width %d: %s line is %d columns: %q", width, name, w, plain)
+				}
+			}
+		}
+	}
+}
+
+// The details pane must show a real uptime value, not a dump of the struct.
+// The underlying pointer-receiver bug is covered by
+// entities.TestStreamMethodsResolveFromTemplate; this asserts the pane the
+// user actually sees.
+func TestDetailsRendersUptime(t *testing.T) {
+	items := newStreamItems([]entities.Stream{
+		{Username: "streamer1", StartedAt: "2020-01-01T00:00:00Z"},
+	}, 80)
+
+	tmpl, err := template.New("d").Funcs(promptui.FuncMap).Parse(streamSelectTemplates().Details)
+	if err != nil {
+		t.Fatalf("parsing details: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, items[0]); err != nil {
+		t.Fatalf("executing details: %v", err)
+	}
+
+	out := ansi.ReplaceAllString(buf.String(), "")
+	if !strings.Contains(out, "Uptime:") {
+		t.Fatalf("details missing the uptime label:\n%s", out)
+	}
+	// A struct dump would carry the thumbnail URL and the language field.
+	if strings.Contains(out, "https://static-cdn") || strings.Contains(out, "{") {
+		t.Errorf("details rendered a raw struct:\n%s", out)
 	}
 }
 

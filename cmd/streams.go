@@ -101,27 +101,18 @@ func pickAndOpen(cmd *cobra.Command, streams []entities.Stream, preferred string
 		return nil
 	}
 
-	templates := &promptui.SelectTemplates{
-		Label:    "{{ . }}",
-		Active:   "▶ {{ .Username | cyan }} ({{ .GameName | yellow }}) - {{ .ViewerCount }} viewers",
-		Inactive: "  {{ .Username }} ({{ .GameName }}) - {{ .ViewerCount }} viewers",
-		Selected: "▶ {{ .Username | cyan }}",
-		Details: `
---- Stream ---
-{{ "Channel:" | faint }}  {{ .Username }}
-{{ "Title:"   | faint }}  {{ .Title }}
-{{ "Game:"    | faint }}  {{ .GameName }}
-{{ "Viewers:" | faint }}  {{ .ViewerCount }}
-{{ "Uptime:"  | faint }}  {{ .Uptime }}`,
-	}
+	items := newStreamItems(streams, terminalWidth())
+	templates := streamSelectTemplates()
 
 	prompt := promptui.Select{
 		Label:     "Select a stream",
-		Items:     streams,
+		Items:     items,
 		Templates: templates,
 		Size:      15,
+		// Search the underlying stream so matching uses the full text, not
+		// the truncated display copy.
 		Searcher: func(input string, index int) bool {
-			return matchesStream(&streams[index], input)
+			return matchesStream(&items[index].stream, input)
 		},
 		StartInSearchMode: false,
 	}
@@ -132,8 +123,87 @@ func pickAndOpen(cmd *cobra.Command, streams []entities.Stream, preferred string
 		return nil
 	}
 
-	stream := streams[i]
+	stream := items[i].stream
 	return openStream(cmd, stream.Username, stream.URL(), preferred)
+}
+
+// streamSelectTemplates renders a streamItem. Every field it interpolates is
+// pre-truncated by newStreamItems, so no rendered line can exceed the terminal
+// width — see the comment on streamItem for why that matters.
+func streamSelectTemplates() *promptui.SelectTemplates {
+	return &promptui.SelectTemplates{
+		Label:    "{{ . }}",
+		Active:   "▶ {{ .Name | cyan }} ({{ .Game | yellow }}) - {{ .Viewers }} viewers",
+		Inactive: "  {{ .Name }} ({{ .Game }}) - {{ .Viewers }} viewers",
+		Selected: "▶ {{ .Name | cyan }}",
+		// The padding belongs inside the quoted labels: whitespace within a
+		// template action is syntax and is not emitted, so spacing it there
+		// leaves the columns ragged.
+		Details: `
+--- Stream ---
+{{ "Channel:" | faint }}  {{ .Name }}
+{{ "Title:  " | faint }}  {{ .Title }}
+{{ "Game:   " | faint }}  {{ .Game }}
+{{ "Viewers:" | faint }}  {{ .Viewers }}
+{{ "Uptime: " | faint }}  {{ .Uptime }}`,
+	}
+}
+
+// streamItem is a display-ready view of a stream, with every field already cut
+// to fit the terminal.
+//
+// This exists because promptui's screen buffer counts the *logical* lines it
+// writes, then moves the cursor up that many rows to redraw. A line wider than
+// the terminal wraps onto extra rows that the buffer does not know about, so
+// the redraw erases too little and leaves the previous frame on screen. Long
+// stream titles are more than enough to trigger it.
+type streamItem struct {
+	Name    string
+	Game    string
+	Title   string
+	Uptime  string
+	Viewers int
+
+	stream entities.Stream
+}
+
+func newStreamItems(streams []entities.Stream, width int) []streamItem {
+	nameWidth, gameWidth, detailWidth := itemWidths(width)
+
+	items := make([]streamItem, len(streams))
+	for i, s := range streams {
+		items[i] = streamItem{
+			Name:    truncate(s.Username, nameWidth),
+			Game:    truncate(s.GameName, gameWidth),
+			Title:   truncate(s.Title, detailWidth),
+			Uptime:  s.Uptime(),
+			Viewers: s.ViewerCount,
+			stream:  s,
+		}
+	}
+	return items
+}
+
+// itemWidths splits the terminal width into per-field budgets.
+func itemWidths(width int) (name, game, detail int) {
+	// A list row renders as "▶ NAME (GAME) - 12345 viewers"; everything
+	// outside the two names costs about 23 columns.
+	const listOverhead = 23
+	// A detail row renders as "Channel:  VALUE" — a 10-column label, plus a
+	// column of slack so the cursor never lands in the final cell.
+	const labelWidth = 11
+
+	avail := max(width-listOverhead, 12)
+	name = avail / 2
+	game = avail - name
+	if name > 24 {
+		game += name - 24
+		name = 24
+	}
+	game = min(game, 32)
+
+	detail = max(width-labelWidth, 20)
+	return name, game, detail
 }
 
 func matchesStream(s *entities.Stream, input string) bool {

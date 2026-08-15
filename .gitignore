@@ -1,4 +1,7 @@
+# Local config — may contain account IDs or credentials.
 .env
+.env.*
+!.env.example
 
 # Build artifacts. "twitch" is the default `go build` name; "ttv" is what the
 # Makefile produces.

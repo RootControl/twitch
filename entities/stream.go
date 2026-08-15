@@ -29,14 +29,19 @@ func NewStream() *Stream {
 	return &Stream{}
 }
 
+// The methods below take value receivers on purpose. They are called from
+// text/template (via the promptui picker), and a pointer method is not in the
+// method set of a non-addressable value — the template silently fails to
+// resolve it and renders the raw struct instead.
+
 // URL is the twitch.tv address of the stream.
-func (s *Stream) URL() string {
+func (s Stream) URL() string {
 	return TwitchURL + s.UserLogin
 }
 
 // Uptime returns how long the stream has been live, formatted as "2h14m".
 // It returns an empty string when started_at is missing or unparseable.
-func (s *Stream) Uptime() string {
+func (s Stream) Uptime() string {
 	return uptimeSince(s.StartedAt, time.Now())
 }
 
@@ -60,7 +65,7 @@ func uptimeSince(startedAt string, now time.Time) string {
 	return fmt.Sprintf("%dm", m)
 }
 
-func (s *Stream) GetMainInfo() string {
+func (s Stream) GetMainInfo() string {
 	info := fmt.Sprintf("User: %s\nTitle: %s\nCategory: %s\n", s.Username, s.Title, s.GameName)
 	if up := s.Uptime(); up != "" {
 		info += fmt.Sprintf("Uptime: %s\n", up)
